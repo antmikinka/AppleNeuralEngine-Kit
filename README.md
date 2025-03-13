@@ -13,5 +13,7 @@ Project Tree
 - HF model
 - CoreML Conversion
 - HF model posting with info
+- Verification Methods
+KL 
 Main.py 
 - ideally is the one script that is user input with CLI, parser orgs that just calls everything else and condenses and cuts code into modules for easier management.
