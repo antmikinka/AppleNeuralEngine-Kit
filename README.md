@@ -7,6 +7,8 @@ Project Tree
 - ScaledLinear
 - ClusterFriendlyLinear & Quantizer
 - Model Splitting
+  - into chunks lm head, cache-processor, chunk blocks
+  - or alternative is chunking the model + implementing stateful cache class and having all those models in sync from beginnging to end compute
 - litgpt dynamic model
 - HF model
 - CoreML Conversion
