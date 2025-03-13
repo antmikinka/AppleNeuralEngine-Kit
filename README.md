@@ -12,6 +12,7 @@ Project Tree
 **Ways to optimize the Cache CoreML**
 (would need to implement model chunking into this to make it worth it)
 (dont believe we can implement prior prequant optimization because cause issues with model loading since we changed it I think)
+https://github.com/huggingface/swift-transformers/blob/21b015691624ad103470370f0f255eb660579511/Examples/Mistral7B/export.py#L121
 - class SliceUpdateKeyValue(Cache):
 - class SliceUpdateMistralAttention(MistralAttention):
 - class StatefulMistralForCasualLM(torch.nn.Module):
