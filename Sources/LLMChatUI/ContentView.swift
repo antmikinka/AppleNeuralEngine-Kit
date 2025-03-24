@@ -12,11 +12,7 @@ struct ContentView: View {
     }
     
     var body: some View {
-        NavigationSplitView(
-            columnVisibility: $navigationState.columnVisibility,
-            preferredCompactColumn: .content,
-            preferredRegularColumn: nil
-        ) {
+        NavigationSplitView(columnVisibility: $navigationState.columnVisibility) {
             // First column: Conversations sidebar
             ConversationListView(viewModel: viewModel)
                 .frame(minWidth: 250, idealWidth: 300, maxWidth: 350)

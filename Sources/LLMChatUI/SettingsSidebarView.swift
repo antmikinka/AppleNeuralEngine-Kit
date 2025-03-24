@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsSidebarView: View {
     @ObservedObject var viewModel: ChatViewModel
     @State private var selectedTab = SettingsTab.models
+    @State private var isShowingDirectoryPicker = false
     
     enum SettingsTab {
         case models
@@ -83,8 +84,6 @@ struct SettingsSidebarView: View {
     }
     
     // MARK: - Tab Contents
-    
-    @State private var isShowingDirectoryPicker = false
     
     private var modelSettings: some View {
         VStack(alignment: .leading, spacing: 16) {
