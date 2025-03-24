@@ -61,7 +61,7 @@ public class TextGenerator {
     public func generateWithCallback(
         text: String,
         maxNewTokens: Int,
-        onToken: @escaping (Int, String) -> Void
+        onToken: @escaping (Int, String, Prediction) -> Void
     ) async throws {
         try pipeline.load()
         
@@ -71,7 +71,7 @@ public class TextGenerator {
         for try await prediction in try pipeline.predict(tokens: tokens, maxNewTokens: maxNewTokens) {
             predictions.append(prediction)
             let fullText = tokenizer.decode(tokens: prediction.allTokens)
-            onToken(prediction.newToken, fullText)
+            onToken(prediction.newToken, fullText, prediction)
         }
     }
 }

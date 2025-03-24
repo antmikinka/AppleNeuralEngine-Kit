@@ -8,11 +8,17 @@ import LLMKit
 class ChatViewModel: ObservableObject {
     // Model state
     @Published var isModelLoaded = false
+    @Published var isModelLoading = false
     @Published var isGenerating = false
     @Published var messages: [ChatMessage] = []
     @Published var loadingStatus = "Loading model..."
+    @Published var loadProgress: Double = 0.0
     @Published var showError = false
     @Published var errorMessage = ""
+    
+    // Performance metrics
+    @Published var loadTime: Double = 0
+    @Published var generationStats: GenerationStats?
     
     // Model configuration
     var repoID: String?
@@ -32,12 +38,15 @@ class ChatViewModel: ObservableObject {
     func loadLocalModel() async {
         await MainActor.run {
             isModelLoaded = false
-            loadingStatus = "Loading model..."
+            isModelLoading = true
+            loadProgress = 0.0
+            loadingStatus = "Preparing to load model..."
         }
         
         do {
             guard let modelDirectory = localModelDirectory else {
                 await showErrorMessage("No model directory specified")
+                await MainActor.run { isModelLoading = false }
                 return
             }
             
@@ -47,11 +56,13 @@ class ChatViewModel: ObservableObject {
             
             guard let tokenizerName = tokenizerName ?? inferTokenizer() else {
                 await showErrorMessage("Unable to infer tokenizer. Please configure tokenizer.")
+                await MainActor.run { isModelLoading = false }
                 return
             }
             
             await MainActor.run {
-                loadingStatus = "Loading model pipeline..."
+                loadingStatus = "Creating model pipeline..."
+                loadProgress = 0.05
             }
             
             let pipeline = try ModelPipeline.from(
@@ -61,8 +72,17 @@ class ChatViewModel: ObservableObject {
                 logitProcessorModelName: logitProcessorModelName
             )
             
+            // Load pipeline with progress updates
+            let loadDuration = try await pipeline.loadWithProgress { status, progress in
+                Task { @MainActor in
+                    self.loadingStatus = status
+                    self.loadProgress = progress
+                }
+            }
+            
             await MainActor.run {
                 loadingStatus = "Loading tokenizer..."
+                loadProgress = 0.9
             }
             
             let tokenizer = try await AutoTokenizer.from(pretrained: tokenizerName, hubApi: .init())
@@ -74,13 +94,18 @@ class ChatViewModel: ObservableObject {
             self.pipeline = pipeline
             self.tokenizer = tokenizer
             self.generator = generator
+            self.loadTime = loadDuration.converted(to: .seconds).value
             
             await MainActor.run {
+                self.loadingStatus = "Model loaded in \(String(format: "%.2f", loadDuration.converted(to: .seconds).value)) seconds"
+                self.loadProgress = 1.0
                 self.isModelLoaded = true
+                self.isModelLoading = false
             }
             
         } catch {
             await showErrorMessage("Failed to load model: \(error.localizedDescription)")
+            await MainActor.run { isModelLoading = false }
         }
     }
     
@@ -88,26 +113,36 @@ class ChatViewModel: ObservableObject {
     func loadRemoteModel() async {
         await MainActor.run {
             isModelLoaded = false
+            isModelLoading = true
+            loadProgress = 0.0
             loadingStatus = "Checking Hugging Face repo..."
         }
         
         do {
             guard let repoID = repoID else {
                 await showErrorMessage("No repository ID specified")
+                await MainActor.run { isModelLoading = false }
                 return
             }
             
             await MainActor.run {
                 loadingStatus = "Downloading model..."
+                loadProgress = 0.05
             }
             
             let modelDirectory = try await downloadModel(repoID: repoID)
             self.localModelDirectory = modelDirectory
             
+            await MainActor.run {
+                loadingStatus = "Model downloaded, preparing to load..."
+                loadProgress = 0.4
+            }
+            
             await loadLocalModel()
             
         } catch {
             await showErrorMessage("Failed to download model: \(error.localizedDescription)")
+            await MainActor.run { isModelLoading = false }
         }
     }
     
@@ -119,6 +154,7 @@ class ChatViewModel: ObservableObject {
         await MainActor.run {
             messages.append(userMessage)
             isGenerating = true
+            generationStats = nil
         }
         
         do {
@@ -135,24 +171,65 @@ class ChatViewModel: ObservableObject {
                 messages.append(assistantMessage)
             }
             
-            var fullGeneratedText = ""
+            let startTime = CFAbsoluteTimeGetCurrent()
+            
+            // These need to be accessed on the main actor to avoid concurrency issues
+            actor GenerationMetrics {
+                var latencies: [Double] = []
+                var newTokenCount: Int = 0
+                
+                func incrementTokenCount() {
+                    newTokenCount += 1
+                }
+                
+                func addLatency(_ value: Double) {
+                    latencies.append(value)
+                }
+                
+                func getStats(totalTime: Double) -> GenerationStats {
+                    let avgLatency = latencies.isEmpty ? 0 : latencies.reduce(0, +) / Double(latencies.count)
+                    let tokensPerSecond = newTokenCount > 0 ? Double(newTokenCount) / totalTime : 0
+                    
+                    return GenerationStats(
+                        tokenCount: newTokenCount,
+                        totalTimeSeconds: totalTime,
+                        averageLatencyMs: avgLatency,
+                        tokensPerSecond: tokensPerSecond
+                    )
+                }
+            }
+            
+            let metrics = GenerationMetrics()
             
             // Generate text with streaming
             try await generator.generateWithCallback(
                 text: text,
                 maxNewTokens: maxNewTokens,
-                onToken: { token, fullText in
+                onToken: { token, fullText, prediction in
+                    // Update UI with generated text
                     Task { @MainActor in
-                        fullGeneratedText = fullText
                         if let index = self.messages.firstIndex(where: { $0.id == assistantMessageID }) {
                             self.messages[index].content = fullText
+                        }
+                    }
+                    
+                    // Track performance stats
+                    Task {
+                        await metrics.incrementTokenCount()
+                        if let latency = prediction.latency?.converted(to: .milliseconds).value {
+                            await metrics.addLatency(latency)
                         }
                     }
                 }
             )
             
+            // Calculate generation statistics
+            let totalTime = CFAbsoluteTimeGetCurrent() - startTime
+            let stats = await metrics.getStats(totalTime: totalTime)
+            
             await MainActor.run {
                 isGenerating = false
+                generationStats = stats
             }
             
         } catch {
@@ -191,7 +268,17 @@ class ChatViewModel: ObservableObject {
         let repo = Hub.Repo(id: repoID, type: .models)
         
         let mlmodelcs = ["Llama*.mlmodelc/*", "logit*", "cache*"]
+        await MainActor.run {
+            self.loadingStatus = "Checking repository \(repoID)..."
+            self.loadProgress = 0.08
+        }
+        
         let filenames = try await hub.getFilenames(from: repo, matching: mlmodelcs)
+        
+        await MainActor.run {
+            self.loadingStatus = "Checking local files..."
+            self.loadProgress = 0.1
+        }
         
         let localURL = hub.localRepoLocation(repo)
         let localFileURLs = filenames.map {
@@ -217,10 +304,17 @@ class ChatViewModel: ObservableObject {
         }
         
         let needsDownload = anyNotExists || isStale
-        guard needsDownload else { return localURL }
+        guard needsDownload else { 
+            await MainActor.run {
+                self.loadingStatus = "Using cached model files"
+                self.loadProgress = 0.35
+            }
+            return localURL 
+        }
         
         await MainActor.run {
-            self.loadingStatus = "Downloading from \(repoID)..."
+            self.loadingStatus = "Preparing to download from \(repoID)..."
+            self.loadProgress = 0.12
         }
         
         if filenames.count == 0 {
@@ -231,6 +325,8 @@ class ChatViewModel: ObservableObject {
             let percent = progress.fractionCompleted * 100
             if !progress.isFinished {
                 Task { @MainActor in
+                    // Scale progress between 0.15 and 0.35
+                    self.loadProgress = 0.15 + (progress.fractionCompleted * 0.2) 
                     self.loadingStatus = "Downloading: \(Int(percent))%"
                 }
             }
@@ -238,9 +334,25 @@ class ChatViewModel: ObservableObject {
         
         await MainActor.run {
             self.loadingStatus = "Download complete"
+            self.loadProgress = 0.35
         }
         
         return downloadDir
+    }
+}
+
+struct GenerationStats {
+    let tokenCount: Int
+    let totalTimeSeconds: Double
+    let averageLatencyMs: Double
+    let tokensPerSecond: Double
+    
+    var formattedLatency: String {
+        return String(format: "%.2f ms/token", averageLatencyMs)
+    }
+    
+    var formattedThroughput: String {
+        return String(format: "%.2f tokens/sec", tokensPerSecond)
     }
 }
 

@@ -71,6 +71,49 @@ public class ModelPipeline {
             throw PipelineError.unsupportedInferenceConfiguration
         }
     }
+    
+    public func loadWithProgress(progressCallback: @escaping (String, Double) -> Void) async throws -> Measurement<UnitDuration> {
+        let loadTimer = CodeTimer()
+        progressCallback("Preparing models for compilation...", 0.05)
+        
+        // First prewarm (compile) the models
+        await Task.yield() // Give UI a chance to update
+        prewarm()
+        progressCallback("Compiling processors...", 0.15)
+        
+        // Load processors
+        await Task.yield()
+        loadableProcessors.forEach {
+            $0.load()
+        }
+        progressCallback("Loading model chunks...", 0.25)
+        
+        // Load each chunk with progress updates
+        let totalChunks = chunks.count
+        for (i, chunk) in chunks.enumerated() {
+            await Task.yield()
+            signposter.withIntervalSignpost("Prepare", "Load Chunk \(i)") {
+                chunk.load()
+            }
+            
+            let progress = 0.25 + 0.7 * (Double(i + 1) / Double(totalChunks))
+            progressCallback("Loading chunk \(i+1)/\(totalChunks)...", progress)
+        }
+        
+        // Setup inference configuration
+        await Task.yield()
+        inferenceConfiguration = .init(from: chunks.compactMap { $0.model })
+        if inferenceConfiguration == nil {
+            // Unable to infer the correct model parameters from the model inputs.
+            // We won't be able to predict.
+            throw PipelineError.unsupportedInferenceConfiguration
+        }
+        
+        let loadDuration = loadTimer.elapsed()
+        progressCallback("Model ready! Loaded in \(loadDuration.converted(to: .seconds).value.formatted(.number.precision(.fractionLength(2)))) seconds", 1.0)
+        
+        return loadDuration
+    }
 
     public func predict(tokens initialTokens: [Int], maxNewTokens: Int) throws -> AsyncThrowingStream<Prediction, Error> {
         guard let inferenceConfiguration else {
