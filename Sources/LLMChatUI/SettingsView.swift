@@ -5,19 +5,16 @@ struct SettingsView: View {
     @State private var repoID: String = ""
     @State private var maxTokens: String = "60"
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedDirectory: URL?
-    @State private var isShowingFilePicker = false
-    
     var body: some View {
         NavigationStack {
             Form {
-                Section(header: Text("Local Model")) {
-                    Button("Select Model Directory") {
-                        isShowingFilePicker = true
-                    }
-                    
+                Section(header: Text("Local Model")) {                    
                     if let directory = viewModel.localModelDirectory {
-                        Text(directory.lastPathComponent)
+                        Text("Current Directory: \(directory.lastPathComponent)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("No directory selected")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -78,20 +75,6 @@ struct SettingsView: View {
                     Button("Done") {
                         dismiss()
                     }
-                }
-            }
-            .fileImporter(
-                isPresented: $isShowingFilePicker,
-                allowedContentTypes: [.folder],
-                allowsMultipleSelection: false
-            ) { result in
-                switch result {
-                case .success(let urls):
-                    if let url = urls.first {
-                        viewModel.localModelDirectory = url
-                    }
-                case .failure(let error):
-                    print("Error selecting directory: \(error.localizedDescription)")
                 }
             }
         }

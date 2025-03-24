@@ -84,42 +84,83 @@ struct SettingsSidebarView: View {
     
     // MARK: - Tab Contents
     
+    @State private var isShowingDirectoryPicker = false
+    
     private var modelSettings: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Model Settings")
                 .font(.headline)
             
-            // Model directory
-            if let directory = viewModel.localModelDirectory {
-                VStack(alignment: .leading) {
-                    Text("Current Model:")
-                        .font(.subheadline)
-                    
-                    Text(directory.lastPathComponent)
-                        .font(.system(.body, design: .monospaced))
-                        .padding(8)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(6)
+            // Step 1: Select model directory
+            Group {
+                Text("Step 1: Select Model Directory")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                Button("Select Directory...") {
+                    isShowingDirectoryPicker = true
+                }
+                .buttonStyle(.bordered)
+                .fileImporter(
+                    isPresented: $isShowingDirectoryPicker,
+                    allowedContentTypes: [.folder],
+                    allowsMultipleSelection: false
+                ) { result in
+                    switch result {
+                    case .success(let urls):
+                        if let url = urls.first {
+                            viewModel.localModelDirectory = url
+                        }
+                    case .failure(let error):
+                        print("Error selecting directory: \(error.localizedDescription)")
+                    }
+                }
+                
+                // Display selected directory
+                if let directory = viewModel.localModelDirectory {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Selected Directory:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Text(directory.lastPathComponent)
+                            .font(.system(.body, design: .monospaced))
+                            .padding(8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(6)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
                 }
             }
             
-            // Model loading button
-            Button("Load Local Model") {
-                Task {
-                    await viewModel.loadLocalModel()
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(viewModel.isModelLoading)
+            Divider()
+                .padding(.vertical, 8)
             
-            Button("Download from Hugging Face") {
-                Task {
-                    await viewModel.loadRemoteModel()
+            // Step 2: Load model
+            Group {
+                Text("Step 2: Initialize Model")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                // Model loading button
+                Button("Load Selected Model") {
+                    Task {
+                        await viewModel.loadLocalModel()
+                    }
                 }
+                .buttonStyle(.borderedProminent)
+                .disabled(viewModel.isModelLoading || viewModel.localModelDirectory == nil)
+                
+                Button("Download from Hugging Face") {
+                    Task {
+                        await viewModel.loadRemoteModel()
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(viewModel.isModelLoading)
             }
-            .buttonStyle(.bordered)
-            .disabled(viewModel.isModelLoading)
             
             // Loading progress
             if viewModel.isModelLoading {

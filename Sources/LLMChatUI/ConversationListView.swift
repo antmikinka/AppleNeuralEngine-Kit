@@ -49,18 +49,18 @@ struct ConversationRow: View {
     let onDelete: () -> Void
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading) {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(conversation.title)
                     .lineLimit(1)
+                    .truncationMode(.tail)
                     .font(.headline)
                 
                 Text(formatDate(conversation.updatedAt))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
             
             if isSelected {
                 Circle()
@@ -68,6 +68,7 @@ struct ConversationRow: View {
                     .frame(width: 8, height: 8)
             }
         }
+        .frame(maxWidth: .infinity)
         .padding(.vertical, 4)
         .contentShape(Rectangle())
         .onTapGesture {

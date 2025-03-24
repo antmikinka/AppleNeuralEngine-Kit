@@ -12,9 +12,14 @@ struct ContentView: View {
     }
     
     var body: some View {
-        NavigationSplitView(columnVisibility: $navigationState.columnVisibility) {
+        NavigationSplitView(
+            columnVisibility: $navigationState.columnVisibility,
+            preferredCompactColumn: .content,
+            preferredRegularColumn: nil
+        ) {
             // First column: Conversations sidebar
             ConversationListView(viewModel: viewModel)
+                .frame(minWidth: 250, idealWidth: 300, maxWidth: 350)
         } content: {
             // Second column: Chat or welcome view
             VStack {
@@ -61,6 +66,7 @@ struct ContentView: View {
             // Third column: Settings sidebar (only shown when requested)
             if navigationState.showSettings {
                 SettingsSidebarView(viewModel: viewModel)
+                    .frame(minWidth: 350, idealWidth: 400, maxWidth: 450)
             } else {
                 Color.clear // Empty detail view when settings aren't shown
             }
