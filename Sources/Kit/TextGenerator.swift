@@ -71,6 +71,9 @@ public class TextGenerator {
         for try await prediction in try pipeline.predict(tokens: tokens, maxNewTokens: maxNewTokens) {
             predictions.append(prediction)
             let fullText = tokenizer.decode(tokens: prediction.allTokens)
+                .replacingOccurrences(of: "<|begin_of_text|>", with: "")
+                .replacingOccurrences(of: "<|end_of_text|>", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
             onToken(prediction.newToken, fullText, prediction)
         }
     }

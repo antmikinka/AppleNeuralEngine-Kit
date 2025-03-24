@@ -3,41 +3,96 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var viewModel = ChatViewModel()
     @State private var inputText = ""
-    @State private var isLoading = false
-    @State private var showSettings = false
+    @State private var showWelcome = true
+    @State private var navigationState = NavigationState()
+    
+    struct NavigationState {
+        var columnVisibility: NavigationSplitViewVisibility = .automatic
+        var showSettings: Bool = false
+    }
     
     var body: some View {
-        NavigationStack {
+        NavigationSplitView(columnVisibility: $navigationState.columnVisibility) {
+            // First column: Conversations sidebar
+            ConversationListView(viewModel: viewModel)
+        } content: {
+            // Second column: Chat or welcome view
             VStack {
                 if viewModel.isModelLoaded {
-                    chatView
+                    if !showWelcome {
+                        chatView
+                    } else {
+                        WelcomeView(viewModel: viewModel, onOpenSettings: {
+                            navigationState.showSettings = true
+                        })
+                        .onAppear {
+                            // Auto-hide welcome after first load
+                            if viewModel.conversationStore.conversations.first?.messages.count ?? 0 > 0 {
+                                showWelcome = false
+                            }
+                        }
+                    }
                 } else {
-                    modelLoadView
+                    WelcomeView(viewModel: viewModel, onOpenSettings: {
+                        navigationState.showSettings = true
+                    })
                 }
             }
-            .navigationTitle("LLM Chat")
+            .navigationTitle(navigationTitle)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button(action: {
-                        showSettings.toggle()
+                        navigationState.showSettings.toggle()
                     }) {
                         Image(systemName: "gear")
                     }
                 }
+                
+                if viewModel.isModelLoaded && showWelcome {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Start Chatting") {
+                            showWelcome = false
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
             }
-            .sheet(isPresented: $showSettings) {
-                SettingsView(viewModel: viewModel)
+        } detail: {
+            // Third column: Settings sidebar (only shown when requested)
+            if navigationState.showSettings {
+                SettingsSidebarView(viewModel: viewModel)
+            } else {
+                Color.clear // Empty detail view when settings aren't shown
             }
-            .alert("Error", isPresented: $viewModel.showError) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(viewModel.errorMessage)
+        }
+        .onAppear {
+            // Initialize the conversations when the app starts
+            viewModel.loadSelectedConversation()
+        }
+        .alert("Error", isPresented: $viewModel.showError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.errorMessage)
+        }
+    }
+    
+    var navigationTitle: String {
+        if viewModel.isModelLoaded {
+            if showWelcome {
+                return "Welcome"
+            } else if let conversation = viewModel.conversationStore.selectedConversation {
+                return conversation.title
+            } else {
+                return "New Chat"
             }
+        } else {
+            return "ANE Chat"
         }
     }
     
     private var chatView: some View {
         VStack {
+            // Chat messages
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     ForEach(viewModel.messages) { message in
@@ -58,60 +113,17 @@ struct ContentView: View {
                     
                     // Show performance metrics after generation completes
                     if let stats = viewModel.generationStats, !viewModel.isGenerating {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Generation Stats:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            HStack {
-                                Label("\(stats.tokenCount) tokens", systemImage: "number")
-                                Spacer()
-                                Label(String(format: "%.2f s", stats.totalTimeSeconds), systemImage: "clock")
-                            }
-                            .font(.caption)
-                            
-                            HStack {
-                                Label(stats.formattedLatency, systemImage: "speedometer")
-                                Spacer()
-                                Label(stats.formattedThroughput, systemImage: "gauge")
-                            }
-                            .font(.caption)
-                        }
-                        .padding()
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(12)
+                        performanceStats(stats)
                     }
                 }
                 .padding()
             }
             
-            // Input area
+            // Model info and input area
             VStack(spacing: 4) {
                 // Model information banner
                 if let directory = viewModel.localModelDirectory {
-                    HStack {
-                        Label {
-                            Text(directory.lastPathComponent)
-                                .font(.caption)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                        } icon: {
-                            Image(systemName: "cpu")
-                                .font(.caption)
-                        }
-                        
-                        Spacer()
-                        
-                        if viewModel.loadTime > 0 {
-                            Text("Loaded: \(String(format: "%.2f", viewModel.loadTime))s")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 4)
-                    .background(Color.gray.opacity(0.05))
-                    .cornerRadius(8)
+                    modelInfoBanner(directory)
                 }
                 
                 // Text input
@@ -121,16 +133,14 @@ struct ContentView: View {
                         .background(Color.gray.opacity(0.2))
                         .cornerRadius(12)
                         .disabled(viewModel.isGenerating)
-                    
-                    Button(action: {
-                        Task {
-                            if !inputText.isEmpty {
-                                let text = inputText
-                                inputText = ""
-                                await viewModel.sendMessage(text)
-                            }
+                        .textFieldStyle(PlainTextFieldStyle())
+                        .submitLabel(.send)
+                        .onSubmit {
+                            sendMessage()
                         }
-                    }) {
+                        .autocorrectionDisabled()
+                    
+                    Button(action: sendMessage) {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.system(size: 32))
                     }
@@ -141,69 +151,66 @@ struct ContentView: View {
         }
     }
     
-    private var modelLoadView: some View {
-        VStack {
-            Text("Select a model to begin")
-                .font(.headline)
+    private func performanceStats(_ stats: GenerationStats) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Generation Stats:")
+                .font(.caption)
+                .foregroundColor(.secondary)
             
-            if viewModel.isModelLoading {
-                // Loading progress view
-                VStack(spacing: 16) {
-                    ProgressView(value: viewModel.loadProgress, total: 1.0)
-                        .progressViewStyle(LinearProgressViewStyle())
-                        .frame(maxWidth: 300)
-                        .animation(.easeInOut, value: viewModel.loadProgress)
-                    
-                    Text(viewModel.loadingStatus)
-                        .font(.caption)
-                    
-                    if viewModel.loadTime > 0 {
-                        Text("Load time: \(String(format: "%.2f", viewModel.loadTime)) seconds")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(12)
-                .padding()
-            } else {
-                // Model selection buttons
-                Button("Load Local Model") {
-                    Task {
-                        await viewModel.loadLocalModel()
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .padding()
-                
-                Button("Download from Hugging Face") {
-                    showSettings.toggle()
-                }
-                .buttonStyle(.bordered)
-                .padding(.bottom)
+            HStack {
+                Label("\(stats.tokenCount) tokens", systemImage: "number")
+                Spacer()
+                Label(String(format: "%.2f s", stats.totalTimeSeconds), systemImage: "clock")
             }
+            .font(.caption)
             
-            // Show directory info if available
-            if let directory = viewModel.localModelDirectory {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Model Directory:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    Text(directory.lastPathComponent)
-                        .font(.caption)
-                        .padding(8)
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(6)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .padding(.horizontal)
-                .padding(.bottom)
+            HStack {
+                Label(stats.formattedLatency, systemImage: "speedometer")
+                Spacer()
+                Label(stats.formattedThroughput, systemImage: "gauge")
             }
+            .font(.caption)
         }
         .padding()
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(12)
+    }
+    
+    private func modelInfoBanner(_ directory: URL) -> some View {
+        HStack {
+            Label {
+                Text(directory.lastPathComponent)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            } icon: {
+                Image(systemName: "cpu")
+                    .font(.caption)
+            }
+            
+            Spacer()
+            
+            if viewModel.loadTime > 0 {
+                Text("Loaded: \(String(format: "%.2f", viewModel.loadTime))s")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 4)
+        .background(Color.gray.opacity(0.05))
+        .cornerRadius(8)
+    }
+    
+    private func sendMessage() {
+        Task {
+            if !inputText.isEmpty {
+                let text = inputText
+                inputText = ""
+                showWelcome = false
+                await viewModel.sendMessage(text)
+            }
+        }
     }
 }
 

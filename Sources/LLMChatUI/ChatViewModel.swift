@@ -20,14 +20,19 @@ class ChatViewModel: ObservableObject {
     @Published var loadTime: Double = 0
     @Published var generationStats: GenerationStats?
     
+    // Conversations
+    @Published var conversationStore = ConversationStore()
+    
     // Model configuration
     var repoID: String?
     var localModelDirectory: URL?
     var localModelPrefix: String?
-    var cacheProcessorModelName = "cache-processor.mlmodelc"
-    var logitProcessorModelName = "logit-processor.mlmodelc" 
     var tokenizerName: String?
     var maxNewTokens = 60
+    
+    // Generation parameters
+    var temperature: Double = 0.7
+    var topP: Double = 0.9
     
     // Core components
     private var pipeline: ModelPipeline?
@@ -61,8 +66,35 @@ class ChatViewModel: ObservableObject {
             }
             
             await MainActor.run {
-                loadingStatus = "Creating model pipeline..."
+                loadingStatus = "Detecting model components..."
                 loadProgress = 0.05
+            }
+            
+            // Auto-detect processor files
+            let fileManager = FileManager.default
+            let directoryContents = try fileManager.contentsOfDirectory(
+                at: modelDirectory, 
+                includingPropertiesForKeys: [.isDirectoryKey], 
+                options: [.skipsHiddenFiles]
+            )
+            
+            // Find cache processor file
+            let cacheProcessorFiles = directoryContents.filter { 
+                $0.lastPathComponent.lowercased().contains("cache") && 
+                $0.lastPathComponent.hasSuffix(".mlmodelc")
+            }
+            let cacheProcessorModelName = cacheProcessorFiles.first?.lastPathComponent ?? "cache-processor.mlmodelc"
+            
+            // Find logit processor file
+            let logitProcessorFiles = directoryContents.filter { 
+                $0.lastPathComponent.lowercased().contains("logit") && 
+                $0.lastPathComponent.hasSuffix(".mlmodelc")
+            }
+            let logitProcessorModelName = logitProcessorFiles.first?.lastPathComponent ?? "logit-processor.mlmodelc"
+            
+            await MainActor.run {
+                loadingStatus = "Creating model pipeline..."
+                loadProgress = 0.1
             }
             
             let pipeline = try ModelPipeline.from(
@@ -153,6 +185,7 @@ class ChatViewModel: ObservableObject {
         
         await MainActor.run {
             messages.append(userMessage)
+            conversationStore.addMessageToSelectedConversation(userMessage)
             isGenerating = true
             generationStats = nil
         }
@@ -169,6 +202,7 @@ class ChatViewModel: ObservableObject {
             
             await MainActor.run {
                 messages.append(assistantMessage)
+                conversationStore.addMessageToSelectedConversation(assistantMessage)
             }
             
             let startTime = CFAbsoluteTimeGetCurrent()
@@ -260,6 +294,23 @@ class ChatViewModel: ObservableObject {
             self.errorMessage = message
             self.showError = true
         }
+    }
+    
+    // Load messages from the selected conversation
+    @MainActor
+    func loadSelectedConversation() {
+        if let conversation = conversationStore.selectedConversation {
+            self.messages = conversation.messages
+        } else {
+            self.messages = []
+        }
+    }
+    
+    // Switch to a different conversation
+    @MainActor
+    func switchConversation(to conversationId: UUID) {
+        conversationStore.selectedConversationId = conversationId
+        loadSelectedConversation()
     }
     
     // Download model from Hugging Face
@@ -362,14 +413,22 @@ enum ChatUIError: Error {
     case generationError
 }
 
-enum MessageRole {
+enum MessageRole: String, Codable {
     case user
     case assistant
     case system
 }
 
-struct ChatMessage: Identifiable {
+struct ChatMessage: Identifiable, Codable, Hashable {
     let id: UUID
     let role: MessageRole
     var content: String
+    var timestamp: Date
+    
+    init(id: UUID = UUID(), role: MessageRole, content: String, timestamp: Date = Date()) {
+        self.id = id
+        self.role = role
+        self.content = content
+        self.timestamp = timestamp
+    }
 }

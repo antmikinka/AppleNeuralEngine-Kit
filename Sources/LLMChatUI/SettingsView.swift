@@ -56,8 +56,20 @@ struct SettingsView: View {
                 }
                 
                 Section(header: Text("Advanced Settings")) {
-                    TextField("Cache Processor Model Name", text: $viewModel.cacheProcessorModelName)
-                    TextField("Logit Processor Model Name", text: $viewModel.logitProcessorModelName)
+                    // Add temperature and top-p controls
+                    HStack {
+                        Text("Temperature:")
+                        Spacer()
+                        Text(String(format: "%.2f", viewModel.temperature))
+                    }
+                    Slider(value: $viewModel.temperature, in: 0...2, step: 0.05)
+                    
+                    HStack {
+                        Text("Top-P:")
+                        Spacer()
+                        Text(String(format: "%.2f", viewModel.topP))
+                    }
+                    Slider(value: $viewModel.topP, in: 0...1, step: 0.05)
                 }
             }
             .navigationTitle("Settings")
