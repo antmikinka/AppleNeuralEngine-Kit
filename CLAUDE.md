@@ -1,1 +1,0 @@
-- Always use descriptive variable names. Include comments with code. Keep an updated project recap. Keep a List of things to implement etc.
