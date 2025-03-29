@@ -1,21 +1,70 @@
-.DS_Store
-/.build
-/Packages
-/*.xcodeproj
+# Swift build artifacts
+.build/
+
+# Xcode user-specific files
 xcuserdata/
+*.xcodeproj/
+*.xcworkspace/
 DerivedData/
-.swiftpm
-.vscode/
-.netrc
+.swiftpm/
 
 # Python
-**/__pycache__/
-**/env/
-**/venv/
-**/.env
-*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+.venv/
+.env/
 
-# Exclude model files
-Llama-3.2-1B-Instruct/
-*.mlmodelc/
-models/
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Model files
+*.mlpackage
+*.mlmodelc
+# Exception for sample small models
+!scripts/model_convert_try/**/*.mlmodelc
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+.temp/
+
+# Reference folders (to be removed before final public release)
+Anemll-main/
+litgpt-main/
+.cleanup_plan/
+
+# Logs
+*.log
