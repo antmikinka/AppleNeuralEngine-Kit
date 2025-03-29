@@ -17,13 +17,6 @@ This guide provides detailed usage instructions for all components of AppleNeura
 swift run ANEChat
 ```
 
-### Loading a Model
-
-1. Click the settings gear icon in the top right
-2. Choose either:
-   - **Local Model**: Select a folder containing CoreML model chunks
-   - **Remote Model**: Enter a HuggingFace repo ID to download
-
 ### Chat Interface
 
 - Type messages in the text field at the bottom
@@ -31,10 +24,33 @@ swift run ANEChat
 - Use the sidebar to switch between conversations
 - Performance metrics are displayed after each generation
 
+### Model Conversion Interface
+
+The app now includes a dedicated model conversion tab:
+
+1. Click the "Convert Model" tab in the main window
+2. Configure your conversion options:
+   - **Model Path**: Select the HuggingFace model directory
+   - **Output Path**: Choose where to save the converted model
+   - **Architecture**: Auto-detect or specify model architecture
+   - **Context Length**: Set maximum context window size
+   - **Batch Size**: Configure prefill batch size
+   - **Chunks**: Set number of model chunks (or auto)
+   - **Quantization**: Choose 4-bit (faster) or 6-bit (higher quality)
+3. Click "Convert Model" to start the conversion with real-time progress tracking
+
+### Loading a Model
+
+1. Click the settings gear icon in the top right
+2. Choose either:
+   - **Local Model**: Select a folder containing CoreML model chunks
+   - **Remote Model**: Enter a HuggingFace repo ID to download
+
 ### Keyboard Shortcuts
 
 - **⌘N**: Create a new chat
 - **⌘,**: Open settings
+- **⌘T**: Switch tabs (Chat/Convert)
 - **⌘W**: Close current window
 - **⌘S**: Save conversation
 - **⌘⏎**: Send message
@@ -89,9 +105,32 @@ swift run ANEModelConverter convert-hf --model-id meta-llama/Llama-3.2-1B --outp
 ```
 
 Options:
-- `--quant-bits 4` - Use 4-bit quantization (default)
-- `--quant-bits 8` - Use 8-bit quantization for higher quality
-- `--verbose` - Show detailed conversion logs
+- `--quant-bits 4` - Use 4-bit quantization (faster, smaller)
+- `--quant-bits 6` - Use 6-bit quantization (balanced)
+- `--quant-bits 8` - Use 8-bit quantization (higher quality)
+- `--context-length 2048` - Set maximum context length
+- `--num-chunks 4` - Set number of model chunks 
+- `--verbose` - Show detailed conversion logs with progress tracking
+
+### Using the Enhanced Python Converter Directly
+
+For detailed progress tracking and architecture-specific optimizations:
+
+```bash
+python scripts/convert_hf_to_coreml.py \
+    --model_path meta-llama/Llama-3.2-1B \
+    --output_path ./converted_model \
+    --max_seq_len 1024 \
+    --batch_size 64 \
+    --quantize_weights 6 \
+    --verbose
+```
+
+This enhanced converter provides:
+- Real-time progress percentage updates
+- ETA (estimated time remaining)
+- Architecture-specific optimizations
+- Auto-detection of optimal chunk count
 
 ### Optimizing Existing CoreML Models
 

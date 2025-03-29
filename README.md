@@ -13,7 +13,8 @@ AppleNeuralEngine-Kit enables you to run Large Language Models directly on Apple
 - Run LLMs (Llama 2, Llama 3, etc.) on Apple Neural Engine with maximum optimization
 - Interactive chat interface with conversation history
 - Command-line tool for scripts and automation
-- Advanced model conversion with architecture-aware optimizations
+- Architecture-aware model conversion with real-time progress tracking
+- Visual model conversion interface in the macOS app
 - Multi-function model chunks for optimal memory usage
 - KV cache optimization for fast token generation
 - Real-time text streaming with performance metrics

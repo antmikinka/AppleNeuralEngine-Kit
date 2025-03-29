@@ -8,24 +8,54 @@ Converting models for ANE requires special optimization techniques to achieve ma
 
 ## Conversion Process
 
-The conversion pipeline involves several key steps:
+The conversion pipeline involves several key steps, with detailed progress tracking for each stage:
 
-1. **Model Splitting**: Split into three components:
+1. **Model Configuration Analysis**: 
+   - Load and analyze the model's configuration
+   - Auto-detect architecture type
+   - Estimate parameter count and recommend chunk size
+
+2. **Model Loading**: 
+   - Load model weights with memory optimization
+   - Apply architecture-specific preprocessing
+
+3. **Model Splitting**: Split into three components:
    - Embeddings layer (token embeddings)
    - Feed Forward Network (transformer layers)
    - LM Head (token prediction)
 
-2. **KV Cache Optimization**: Create prefill models for efficient processing of long contexts
+4. **KV Cache Optimization**: 
+   - Create prefill models for efficient processing of long contexts
+   - Optimize attention mechanisms based on architecture
 
-3. **Multi-Function Chunks**: Merge FFN and prefill models to optimize weight sharing
+5. **Multi-Function Chunks**: 
+   - Merge FFN and prefill models to optimize weight sharing
+   - Reduce total model size by approximately 50%
 
-4. **LUT Quantization**: Apply Look-Up Table quantization with architecture-specific settings
+6. **LUT Quantization**: 
+   - Apply Look-Up Table quantization with architecture-specific settings
+   - Use different precision for different model components
 
-5. **Compilation**: Convert to MLModelC format for efficient on-device execution
+7. **Compilation**: 
+   - Convert to MLModelC format for efficient on-device execution
+   - Optimize for Apple Neural Engine
 
 ## Using the Conversion Tool
 
-### Option 1: Using the Swift CLI
+### Option 1: Using the Visual Interface
+
+The macOS app includes a built-in model conversion interface:
+
+1. Launch the app: `swift run ANEChat`
+2. Click on the "Convert Model" tab
+3. Fill in the conversion options:
+   - Model Path: Select HuggingFace model directory
+   - Output Path: Choose where to save the converted model
+   - Architecture: Auto-detect or specify model type
+   - Context Length, Batch Size, Chunks, etc.
+4. Click "Convert Model" to start the process with real-time progress tracking
+
+### Option 2: Using the Swift CLI
 
 ```bash
 swift run ANEModelConverter convert-hf \
@@ -36,17 +66,25 @@ swift run ANEModelConverter convert-hf \
     --lut-bits 6
 ```
 
-### Option 2: Using the Python Script
+### Option 3: Using the Python Script
+
+For direct access to the conversion process with detailed progress reporting:
 
 ```bash
-python Scripts/convert_model.py \
-    --model /path/to/model \
-    --output ./converted_model \
-    --context 1024 \
-    --batch-size 64 \
-    --chunks 2 \
-    --lut 6
+python scripts/convert_hf_to_coreml.py \
+    --model_path meta-llama/Llama-3.2-1B \
+    --output_path ./converted_model \
+    --max_seq_len 1024 \
+    --batch_size 64 \
+    --quantize_weights 6 \
+    --verbose
 ```
+
+You'll see detailed progress indicators showing:
+- Overall completion percentage
+- Current conversion step
+- Estimated time remaining
+- Architecture-specific optimizations being applied
 
 ## Conversion Parameters
 
@@ -109,15 +147,38 @@ swift run ANEChat
 swift run ANEToolCLI --model-path ./converted_model --prompt "Hello, world!"
 ```
 
+## Monitoring Conversion Progress
+
+With the enhanced progress tracking, you can now monitor each step of the conversion process:
+
+1. **Configuration Analysis**:
+   - Displays model details (parameters, architecture)
+   - Shows recommended chunk count based on architecture analysis
+
+2. **Weight Loading**:
+   - Progress indicators for loading large model files
+   - Memory usage optimization notification
+
+3. **Optimization Phase**:
+   - Shows which architecture-specific optimizations are being applied
+   - Details on any compatibility adjustments being made
+
+4. **Conversion and Quantization**:
+   - Progress metrics for CoreML conversion
+   - Notifications for each major conversion step
+   - ETA based on processing speed
+
 ## Troubleshooting
 
 If conversion fails:
 
-1. Check error messages for specific step failures
+1. Check the detailed error messages for specific step failures
 2. Verify input model format and completeness
 3. Try increasing chunk count for large models
 4. Use `--skip-check` if dependency checks are failing incorrectly
-5. Use `--restart N` to resume from a specific step (1-8)
+5. Use `--verbose` to get more detailed progress and debugging information
+6. Check for available memory (conversion requires significant RAM)
+7. For large models, ensure your system meets the minimum requirements
 
 ## Credits
 
