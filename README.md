@@ -1,60 +1,81 @@
 # AppleNeuralEngine-Kit
 
-A Swift toolkit for running LLMs on Apple Neural Engine (ANE) using CoreML, with both command-line and SwiftUI interfaces.
+A Swift toolkit for running LLMs on Apple Neural Engine (ANE) with optimized performance, providing both command-line and SwiftUI interfaces.
 
-## Features
+## Overview
 
-- Fast inference of CoreML-compatible LLMs (Llama 2, Llama 3, etc.) using Apple Neural Engine
-- Both CLI and SwiftUI interfaces for model interaction
-- Optimized memory usage with IOSurface-backed CVPixelBuffers
-- Tensor reshaping for faster matrix operations
-- Model chunking for efficient loading and memory management
-- Asynchronous KV cache updates for improved performance
-- Real-time text streaming in the UI
+AppleNeuralEngine-Kit enables you to run Large Language Models directly on Apple Silicon using the Neural Engine for maximum efficiency and performance.
+
+![ANE Chat Screenshot](Assets.xcassets/screenshot.png)
+
+## Key Features
+
+- Run LLMs (Llama 2, Llama 3, etc.) on Apple Neural Engine with maximum optimization
+- Interactive chat interface with conversation history
+- Command-line tool for scripts and automation
+- Model conversion tools for optimizing HuggingFace models
+- Efficient memory management with chunked model loading
+- Real-time text streaming with performance metrics
+
+## Quick Start
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/antmikinka/AppleNeuralEngine-Kit.git
+cd AppleNeuralEngine-Kit
+
+# Build the project
+swift build
+```
+
+### Chat Interface
+
+```bash
+swift run ANEChat
+```
+
+### Command Line
+
+```bash
+swift run ANEToolCLI --repo-id meta-llama/Llama-3.2-1B --input-text "Tell me about neural networks"
+```
+
+### Model Conversion
+
+```bash
+swift run ANEModelConverter convert-hf --model-id meta-llama/Llama-3.2-1B --output-dir ./models
+```
+
+## Documentation
+
+- [Usage Guide](docs/USAGE.md) - Detailed usage instructions for all components
+- [Architecture](docs/ARCHITECTURE.md) - Overview of system design and components
+- [Model Conversion](docs/MODEL_CONVERSION.md) - How to convert and optimize models
+- [Development Guide](docs/DEVELOPMENT.md) - Information for contributors and developers
 
 ## Requirements
 
 - macOS 14 (Sonoma) or newer
+- Apple Silicon Mac (M1/M2/M3 series)
 - Swift 5.9 or newer
-
-## Components
-
-### CLI Tool
-
-Download and run CoreML-compatible LLMs from the command line:
-
-```shell
-$ swift run LLMCLI --repo-id smpanaro/Llama-2-7b-coreml
-```
-
-### SwiftUI App
-
-Interact with CoreML LLMs using a chat interface:
-
-```shell
-$ swift run LLMChatUI
-```
-
-### LLMKit Library
-
-Core functionality available as a Swift library for integration in other projects.
-
-## Installation
-
-1. Clone this repository
-2. Run `swift build` to build the project
-3. Use the CLI with `swift run LLMCLI` or the UI with `swift run LLMChatUI`
+- Python 3.8+ with transformers and coremltools (for model conversion)
 
 ## Performance
 
-| Variant | 1st Load Time | 2nd+ Load Time | Tokens/Sec   | ANE Power |
-|---------|---------------|----------------|--------------|-----------|
-| M1 Max  | 113s          | 8.1s           | 7.02 ± 0.11  | 4.2W      |
-| M3 Max  | -             | 0.8s           | 13.92 ± 0.5  | 8W        |
+| Model                | Tokens/Sec | 1st Load | Subsequent Loads |
+|----------------------|------------|----------|------------------|
+| Llama-3.2-1B (M1)    | 7.0        | 113s     | 8.1s             |
+| Llama-3.2-1B (M3)    | 13.9       | 30s      | 0.8s             |
+| Llama-3.2-3B (M3)    | 5.2        | 201s     | 3.1s             |
 
 ## Credits
 
-This project is based on [CoreML LLM CLI](https://github.com/smpanaro/coreml-llm-cli) by Stephen Panaro, extended with a UI interface and library structure.
+This project builds upon:
+- [CoreML LLM CLI](https://github.com/smpanaro/coreml-llm-cli) by Stephen Panaro
+- [LitGPT](https://github.com/Lightning-AI/lit-gpt) for model optimization techniques
+- [Apple Silicon 4-bit quantization](https://github.com/apple/coremltools) for efficient model sizing
 
 ## License
 

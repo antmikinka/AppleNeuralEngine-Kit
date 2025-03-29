@@ -4,14 +4,15 @@
 import PackageDescription
 
 let package = Package(
-    name: "LLMCLI",
+    name: "AppleNeuralEngine-Kit",
     platforms: [
         .macOS(.v14),
     ],
     products: [
-        .executable(name: "LLMCLI", targets: ["LLMCLI"]),
-        .library(name: "LLMKit", targets: ["LLMKit"]),
-        .executable(name: "LLMChatUI", targets: ["LLMChatUI"]),
+        .executable(name: "ANEToolCLI", targets: ["ANEToolCLI"]),
+        .library(name: "ANEKit", targets: ["ANEKit"]),
+        .executable(name: "ANEChat", targets: ["ANEChat"]),
+        .executable(name: "ANEModelConverter", targets: ["ANEModelConverter"]),
     ],
     dependencies: [
         .package(url: "https://github.com/huggingface/swift-transformers", from: "0.1.13"),
@@ -20,19 +21,18 @@ let package = Package(
     targets: [
         // CLI Target
         .executableTarget(
-            name: "LLMCLI",
+            name: "ANEToolCLI",
             dependencies: [
-                "LLMKit",
+                "ANEKit",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "Transformers", package: "swift-transformers"),
             ],
-            path: "Sources",
-            exclude: ["Kit", "LLMChatUI"]
+            path: "Sources/CommandLine"
         ),
         
         // Library Target for shared code
         .target(
-            name: "LLMKit",
+            name: "ANEKit",
             dependencies: [
                 .product(name: "Transformers", package: "swift-transformers"),
             ],
@@ -41,12 +41,22 @@ let package = Package(
         
         // UI Application Target
         .executableTarget(
-            name: "LLMChatUI",
+            name: "ANEChat",
             dependencies: [
-                "LLMKit",
+                "ANEKit",
                 .product(name: "Transformers", package: "swift-transformers"),
             ],
-            path: "Sources/LLMChatUI"
+            path: "Sources/ANEChat"
+        ),
+        
+        // Model Converter Target
+        .executableTarget(
+            name: "ANEModelConverter",
+            dependencies: [
+                "ANEKit",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
+            path: "Sources/ModelConverter"
         ),
     ]
 )
