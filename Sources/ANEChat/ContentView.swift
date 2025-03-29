@@ -5,6 +5,12 @@ struct ContentView: View {
     @State private var inputText = ""
     @State private var showWelcome = true
     @State private var navigationState = NavigationState()
+    @State private var selectedTab = Tab.chat
+    
+    enum Tab {
+        case chat
+        case modelConversion
+    }
     
     struct NavigationState {
         var columnVisibility: NavigationSplitViewVisibility = .automatic
@@ -12,6 +18,25 @@ struct ContentView: View {
     }
     
     var body: some View {
+        TabView(selection: $selectedTab) {
+            // Chat Tab
+            chatTabView
+                .tabItem {
+                    Label("Chat", systemImage: "bubble.left.and.bubble.right")
+                }
+                .tag(Tab.chat)
+            
+            // Model Conversion Tab
+            ModelConversionView()
+                .tabItem {
+                    Label("Convert Model", systemImage: "wand.and.stars")
+                }
+                .tag(Tab.modelConversion)
+        }
+        .frame(minWidth: 900, minHeight: 600)
+    }
+    
+    private var chatTabView: some View {
         NavigationSplitView(columnVisibility: $navigationState.columnVisibility) {
             // First column: Conversations sidebar
             ConversationListView(viewModel: viewModel)
